@@ -94,5 +94,8 @@ def mood_song():
 
     return jsonify({"message": f"Dodałam utwór: {song}"})
 if __name__ == "__main__":
-    app.run(port=8888, debug=True)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
 
