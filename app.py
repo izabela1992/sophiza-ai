@@ -1,4 +1,3 @@
-
 import os
 from flask import Flask, request, redirect, session, jsonify
 from spotipy import Spotify
@@ -16,16 +15,26 @@ CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
 SCOPE = "playlist-modify-public"
 
-sp_oauth = SpotifyOAuth(client_id=CLIENT_ID,
-                        client_secret=CLIENT_SECRET,
-                        redirect_uri=REDIRECT_URI,
-                        scope=SCOPE)
+sp_oauth = SpotifyOAuth(
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    redirect_uri=REDIRECT_URI,
+    scope=SCOPE
+)
+
 token_info_global = None
 
+
 @app.route("/")
+def home():
+    return "Witaj w Sophiza AI 🌙 Przejdź do /login, by zalogować się do Spotify."
+
+
+@app.route("/login")
 def login():
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
+
 
 @app.route("/callback")
 def callback():
@@ -46,7 +55,7 @@ def add_song():
 
     data = request.get_json()
     song_name = data.get("song_name")
-    playlist_id = "2R9BQWb8j1wL9YxHk4soxT"  # Twoja playlista
+    playlist_id = "2R9BQWb8j1wL9YxHk4soxT"
 
     results = sp.search(q=song_name, limit=1, type="track")
     if not results["tracks"]["items"]:
@@ -59,7 +68,7 @@ def add_song():
 
 @app.route("/mood_song", methods=["POST"])
 def mood_song():
-    token_info = session.get("token_info_global", None)
+    global token_info_global
     if not token_info_global:
         return jsonify({"error": "Brak tokena. Najpierw zaloguj się."}), 403
 
@@ -69,7 +78,6 @@ def mood_song():
     data = request.get_json()
     mood_text = data.get("mood", "").lower()
 
-    # Prosty dobór nastroju do piosenki
     mood_map = {
         "smutna": "Daughter – Youth",
         "pusta": "AURORA – Runaway",
@@ -81,7 +89,6 @@ def mood_song():
         "bezsilność": "Agnes Obel – Dorian"
     }
 
-    # Domyślna piosenka
     song = mood_map.get(mood_text, "Sleeping at Last – Saturn")
 
     results = sp.search(q=song, limit=1, type="track")
@@ -89,14 +96,12 @@ def mood_song():
         return jsonify({"error": f"Nie znaleziono utworu: {song}"}), 404
 
     track_id = results["tracks"]["items"][0]["id"]
-    playlist_id = "2R9BQWb8j1wL9YxHk4soxT"  # Twoja playlista
+    playlist_id = "2R9BQWb8j1wL9YxHk4soxT"
     sp.playlist_add_items(playlist_id, [track_id])
 
     return jsonify({"message": f"Dodałam utwór: {song}"})
+
+
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-
-
