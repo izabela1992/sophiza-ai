@@ -1,3 +1,4 @@
+
 import os
 from flask import Flask, request, redirect, session, jsonify
 from spotipy import Spotify
@@ -22,36 +23,42 @@ sp_oauth = SpotifyOAuth(
     scope=SCOPE
 )
 
-token_info_global = None
-
-
 @app.route("/")
 def home():
     return "Witaj w Sophiza AI 🌙 Przejdź do /login, by zalogować się do Spotify."
-
 
 @app.route("/login")
 def login():
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
 
-
 @app.route("/callback")
 def callback():
-    global token_info_global
     code = request.args.get("code")
-    token_info_global = sp_oauth.get_access_token(code)
-    
+    token_info = sp_oauth.get_access_token(code)
+    session["token_info"] = token_info
     return "Autoryzacja zakończona sukcesem. Możesz teraz dodać utwór."
 
+def get_token():
+    token_info = session.get("token_info", None)
+    if not token_info:
+        return None
+    return token_info
+
+def ensure_token():
+    token_info = get_token()
+    if token_info and sp_oauth.is_token_expired(token_info):
+        token_info = sp_oauth.refresh_access_token(token_info["refresh_token"])
+        session["token_info"] = token_info
+    return token_info
 
 @app.route("/add_song", methods=["POST"])
 def add_song():
-    global token_info_global
-    if not token_info_global:
+    token_info = ensure_token()
+    if not token_info:
         return jsonify({"error": "Brak tokena. Najpierw zaloguj się."}), 403
 
-    access_token = token_info_global["access_token"]
+    access_token = token_info["access_token"]
     sp = Spotify(auth=access_token)
 
     data = request.get_json()
@@ -66,16 +73,13 @@ def add_song():
     sp.playlist_add_items(playlist_id, [track_id])
     return jsonify({"message": f"Utwór '{song_name}' dodany do playlisty."})
 
-
-    
-
 @app.route("/mood_song", methods=["POST"])
 def mood_song():
-    global token_info_global
-    if not token_info_global:
+    token_info = ensure_token()
+    if not token_info:
         return jsonify({"error": "Brak tokena. Najpierw zaloguj się."}), 403
 
-    access_token = token_info_global["access_token"]
+    access_token = token_info["access_token"]
     sp = Spotify(auth=access_token)
 
     data = request.get_json()
@@ -98,8 +102,6 @@ def mood_song():
 
     sp.playlist_add_items(playlist_id, [new_track["id"]])
     return jsonify({"message": f"Dodałam: {new_track['name']} – {new_track['artists'][0]['name']} do playlisty."})
-
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
