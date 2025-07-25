@@ -47,7 +47,7 @@ def login():
 @app.route("/callback")
 def callback():
     code = request.args.get("code")
-    token_info = sp_oauth.get_access_token(code)
+    token_info = sp_oauth.get_access_token(code=code, as_dict=True)
     save_token(token_info)
     return "Autoryzacja zakończona sukcesem. Możesz teraz dodać utwór."
 
