@@ -41,6 +41,7 @@ def callback():
     global token_info_global
     code = request.args.get("code")
     token_info_global = sp_oauth.get_access_token(code)
+    
     return "Autoryzacja zakończona sukcesem. Możesz teraz dodać utwór."
 
 
@@ -66,6 +67,8 @@ def add_song():
     return jsonify({"message": f"Utwór '{song_name}' dodany do playlisty."})
 
 
+    
+
 @app.route("/mood_song", methods=["POST"])
 def mood_song():
     global token_info_global
@@ -78,28 +81,24 @@ def mood_song():
     data = request.get_json()
     mood_text = data.get("mood", "").lower()
 
-    mood_map = {
-        "smutna": "Daughter – Youth",
-        "pusta": "AURORA – Runaway",
-        "nostalgia": "Lana Del Rey – Video Games",
-        "radość": "Vance Joy – Riptide",
-        "nadzieja": "Coldplay – Paradise",
-        "miłość": "Ben Howard – Only Love",
-        "zmęczenie": "Riverside – Lost (Why Should I Be Frightened by a Hat?)",
-        "bezsilność": "Agnes Obel – Dorian"
-    }
+    results = sp.search(q=mood_text, limit=10, type="track")
+    tracks = results.get("tracks", {}).get("items", [])
 
-    song = mood_map.get(mood_text, "Sleeping at Last – Saturn")
+    if not tracks:
+        return jsonify({"error": f"Nie znalazłam utworu pasującego do: {mood_text}"}), 404
 
-    results = sp.search(q=song, limit=1, type="track")
-    if not results["tracks"]["items"]:
-        return jsonify({"error": f"Nie znaleziono utworu: {song}"}), 404
-
-    track_id = results["tracks"]["items"][0]["id"]
     playlist_id = "2R9BQWb8j1wL9YxHk4soxT"
-    sp.playlist_add_items(playlist_id, [track_id])
+    existing_tracks = sp.playlist_tracks(playlist_id)
+    existing_ids = [item["track"]["id"] for item in existing_tracks["items"]]
 
-    return jsonify({"message": f"Dodałam utwór: {song}"})
+    new_track = next((track for track in tracks if track["id"] not in existing_ids), None)
+
+    if not new_track:
+        return jsonify({"error": "Nie znalazłam nowej piosenki, która nie byłaby już na playliście."}), 400
+
+    sp.playlist_add_items(playlist_id, [new_track["id"]])
+    return jsonify({"message": f"Dodałam: {new_track['name']} – {new_track['artists'][0]['name']} do playlisty."})
+
 
 
 if __name__ == "__main__":
