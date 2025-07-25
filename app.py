@@ -1,6 +1,6 @@
-
 import os
-from flask import Flask, request, redirect, session, jsonify
+import json
+from flask import Flask, request, redirect, jsonify
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
@@ -23,6 +23,18 @@ sp_oauth = SpotifyOAuth(
     scope=SCOPE
 )
 
+TOKEN_FILE = "token.json"
+
+def save_token(token_info):
+    with open(TOKEN_FILE, "w") as f:
+        json.dump(token_info, f)
+
+def load_token():
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, "r") as f:
+            return json.load(f)
+    return None
+
 @app.route("/")
 def home():
     return "Witaj w Sophiza AI 🌙 Przejdź do /login, by zalogować się do Spotify."
@@ -36,25 +48,12 @@ def login():
 def callback():
     code = request.args.get("code")
     token_info = sp_oauth.get_access_token(code)
-    session["token_info"] = token_info
+    save_token(token_info)
     return "Autoryzacja zakończona sukcesem. Możesz teraz dodać utwór."
-
-def get_token():
-    token_info = session.get("token_info", None)
-    if not token_info:
-        return None
-    return token_info
-
-def ensure_token():
-    token_info = get_token()
-    if token_info and sp_oauth.is_token_expired(token_info):
-        token_info = sp_oauth.refresh_access_token(token_info["refresh_token"])
-        session["token_info"] = token_info
-    return token_info
 
 @app.route("/add_song", methods=["POST"])
 def add_song():
-    token_info = ensure_token()
+    token_info = load_token()
     if not token_info:
         return jsonify({"error": "Brak tokena. Najpierw zaloguj się."}), 403
 
@@ -75,7 +74,7 @@ def add_song():
 
 @app.route("/mood_song", methods=["POST"])
 def mood_song():
-    token_info = ensure_token()
+    token_info = load_token()
     if not token_info:
         return jsonify({"error": "Brak tokena. Najpierw zaloguj się."}), 403
 
